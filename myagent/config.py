@@ -30,13 +30,22 @@ class AgentConfig:
     @classmethod
     def from_environment(cls, workspace: Path | None = None) -> "AgentConfig":
         resolved_workspace = (workspace or Path(os.getenv("MYAGENT_WORKSPACE", "."))).resolve()
+        provider = os.getenv("MYAGENT_PROVIDER", "minimax")
+        if provider == "qwen":
+            api_key = os.getenv("QWEN_API_KEY")
+            model = os.getenv("QWEN_MODEL", "qwen-plus")
+            base_url = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
+        else:
+            api_key = os.getenv("MINIMAX_API_KEY")
+            model = os.getenv("MINIMAX_MODEL", "MiniMax-M3")
+            base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.cn/anthropic")
         return cls(
             workspace=resolved_workspace,
-            api_key=os.getenv("MINIMAX_API_KEY"),
+            api_key=api_key,
             network_mode=os.getenv("MYAGENT_NETWORK_MODE", "deny"),
             model=ModelProfile(
-                provider="minimax",
-                model=os.getenv("MINIMAX_MODEL", "MiniMax-M3"),
-                base_url=os.getenv("MINIMAX_BASE_URL", "https://api.minimax.cn/anthropic"),
+                provider=provider,
+                model=model,
+                base_url=base_url,
             ),
         )

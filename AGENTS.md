@@ -35,7 +35,8 @@ Myagent_01/
 │   ├── session.py            # In-memory Session and SessionStore
 │   ├── runtime.py            # Default dependency composition
 │   ├── providers/
-│   │   └── minimax.py        # MiniMax Anthropic-compatible provider
+│   │   ├── minimax.py        # MiniMax Anthropic-compatible provider
+│   │   └── qwen.py           # Qwen OpenAI-compatible provider
 │   ├── security/
 │   │   ├── permissions.py    # allow/ask/deny rules and CLI approval handler
 │   │   ├── sandbox.py        # SandboxBackend abstraction
@@ -71,7 +72,10 @@ Myagent_01/
 - Added `--mode plan|build`: `plan` exposes only read and Git inspection tools; `build` exposes all tools and asks before edits or non-Git shell commands.
 - Wired `AgentConfig.max_steps` into CLI task execution.
 - Added tests for workspace escape, permissions, exact replacement, FakeProvider-driven Agent execution, CLI approval, and runtime mode tool exposure.
-- Installed development dependencies and verified `python -m compileall myagent main.py` and `python -m pytest`; the suite currently has 10 passing tests.
+- Added Qwen Provider using the OpenAI SDK and OpenAI-compatible Qwen endpoint.
+- Added provider selection via `MYAGENT_PROVIDER` environment variable (`minimax` or `qwen`).
+- Added Qwen Provider contract tests using mocked OpenAI responses.
+- Installed development dependencies and verified `python -m compileall myagent main.py` and `python -m pytest`; the suite currently has 14 passing tests.
 - Migrated mistakenly created source files from `D:\testDevelop\AiTest01\myagent` into this repository. The source of truth is now this repository's `myagent/` directory.
 
 ## Important Current Limitations
@@ -99,8 +103,9 @@ Myagent_01/
 ### Provider
 
 - MiniMax real API integration has not been run with an API key.
+- Qwen real API integration has not been run with an API key.
 - Streaming, retry policy, rate-limit mapping, and non-native text-tool protocols are not implemented.
-- No second Provider exists yet. Add it only through `LLMProvider` plus provider contract tests.
+- Provider selection is configured via `MYAGENT_PROVIDER` environment variable.
 
 ### Tools
 
@@ -147,4 +152,4 @@ python main.py --workspace . --mode plan "Inspect this project"
 python main.py --workspace . --mode build "Inspect this project and run tests"
 ```
 
-For a real MiniMax session, configure `MINIMAX_API_KEY` in the environment. Do not commit `.env`.
+For a real MiniMax session, configure `MINIMAX_API_KEY` in the environment. For Qwen, set `MYAGENT_PROVIDER=qwen` and `QWEN_API_KEY`. Do not commit `.env`.

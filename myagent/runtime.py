@@ -8,6 +8,7 @@ from pathlib import Path
 from .config import AgentConfig
 from .core import Agent
 from .providers.minimax import MiniMaxProvider
+from .providers.qwen import QwenProvider
 from .security.permissions import ApprovalHandler, PermissionEffect, PermissionEngine, PermissionRule
 from .security.sandbox import ProcessResult
 from .security.workspace import WorkspaceResolver
@@ -50,7 +51,10 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
     registry = ToolRegistry()
     for tool in (ReadFileTool(), GlobTool(), GrepTool(), EditFileTool(), WriteFileTool(), ApplyPatchTool(), git_status(), git_diff(), ShellTool()):
         registry.register(tool)
-    provider = MiniMaxProvider(config.api_key or "", config.model.base_url, config.model.model)
+    if config.model.provider == "qwen":
+        provider = QwenProvider(config.api_key or "", config.model.base_url, config.model.model)
+    else:
+        provider = MiniMaxProvider(config.api_key or "", config.model.base_url, config.model.model)
     if mode == "plan":
         registry = ToolRegistry()
         for tool in (ReadFileTool(), GlobTool(), GrepTool(), git_status(), git_diff()):
