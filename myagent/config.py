@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 @dataclass(frozen=True)
 class ModelProfile:
@@ -29,20 +31,21 @@ class AgentConfig:
 
     @classmethod
     def from_environment(cls, workspace: Path | None = None) -> "AgentConfig":
+        load_dotenv()
         resolved_workspace = (workspace or Path(os.getenv("MYAGENT_WORKSPACE", "."))).resolve()
-        provider = os.getenv("MYAGENT_PROVIDER", "minimax")
+        provider = os.getenv("MYAGENT_PROVIDER", "minimax")  # TODO 没有provider应该提示配置
         if provider == "qwen":
             api_key = os.getenv("QWEN_API_KEY")
             model = os.getenv("QWEN_MODEL", "qwen-plus")
             base_url = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-        else:
+        else: # TODO 应该用elif去增加provider选择，不用默认minimax
             api_key = os.getenv("MINIMAX_API_KEY")
             model = os.getenv("MINIMAX_MODEL", "MiniMax-M3")
             base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.cn/anthropic")
         return cls(
             workspace=resolved_workspace,
             api_key=api_key,
-            network_mode=os.getenv("MYAGENT_NETWORK_MODE", "deny"),
+            network_mode=os.getenv("MYAGENT_NETWORK_MODE", "deny"),  # 后续用来支持网络访问控制
             model=ModelProfile(
                 provider=provider,
                 model=model,

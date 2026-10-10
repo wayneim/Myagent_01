@@ -22,17 +22,17 @@ class Agent:
     tools: ToolRegistry
     permission_engine: Any
     execution_context: ExecutionContext
-    session_store: SessionStore | None = None
+    session_store: SessionStore | None = None       # 会话存储
     system_prompt: str = SYSTEM_PROMPT
     event_handler: Callable[[AgentEvent], None] | None = None
 
     def run(self, task: str, max_steps: int | None = None) -> AgentResponse:
         if max_steps is None:
             max_steps = 20
-        store = self.session_store or SessionStore()
+        store = self.session_store or SessionStore()    # TODO 不传session_store则当前方法结束会导致上下文清空，需要改进
         session = store.create(self.execution_context.workspace)
         session.messages.append({"role": "user", "content": task})
-        self._emit(session, AgentEvent(EventType.TASK_STARTED, {"task": task, "session_id": session.session_id}))
+        self._emit(session, AgentEvent(EventType.TASK_STARTED, {"task": task, "session_id": session.session_id})) # 追加和打印事件
 
         for _ in range(max_steps):
             turn = self.provider.respond(self.system_prompt, session.messages, self.tools.definitions())

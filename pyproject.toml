@@ -1,8 +1,8 @@
-[build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+[build-system]  # 告诉打包工具怎么构建包
+requires = ["setuptools>=68"]  # 构建阶段需要的包（不是运行依赖）
+build-backend = "setuptools.build_meta"  # 构建后端
 
-[project]
+[project]  # 这部分是 pip、PyPI 读取的标准信息
 name = "myagent"
 version = "0.1.0"
 description = "Extensible local coding agent"
@@ -10,14 +10,15 @@ requires-python = ">=3.11"
 dependencies = [
   "anthropic>=0.49,<1",
   "openai>=1,<2",
+  "python-dotenv>=1,<2",
 ]
 
-[project.optional-dependencies]
+[project.optional-dependencies]  # 可选依赖组
 dev = ["pytest>=8,<9"]
 
-[project.scripts]
+[project.scripts]  # CLI 命令入口
 myagent = "myagent.cli.repl:main"
 
-[tool.pytest.ini_options]
+[tool.pytest.ini_options]  # pytest 的配置
 testpaths = ["tests"]
 pythonpath = ["."]

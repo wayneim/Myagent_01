@@ -25,14 +25,15 @@ def _print_event(event: AgentEvent) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="MyAgent coding assistant")
-    parser.add_argument("task", nargs="?", help="One-shot task")
+    parser.add_argument("task", nargs="?", help="One-shot task")                # 可选的一次性任务指令，提供则执行完退出，不进入循环
     parser.add_argument("--workspace", type=Path, default=None)
-    parser.add_argument("--json-events", action="store_true")
-    parser.add_argument("--mode", choices=("plan", "build"), default="build")
+    parser.add_argument("--json-events", action="store_true")                   # 开启后所有事件输出 JSON 格式
+    parser.add_argument("--mode", choices=("plan", "build"), default="build")   # 运行模式
     args = parser.parse_args()
     config = AgentConfig.from_environment(args.workspace)
+    # 打印事件
     handler = lambda event: print(json.dumps({"type": event.type.value, "data": event.data}, default=str)) if args.json_events else _print_event(event)
-    approval_handler = None if args.json_events else CliApprovalHandler()
+    approval_handler = None if args.json_events else CliApprovalHandler()       # None，意味着不提示用户审批，所有需要审批的操作（如写文件、执行 shell）会被默认拒绝。否则创建 CliApprovalHandler，终端会弹出 allow/ask/deny 的交互式确认提示。
     agent = build_agent(config, handler, mode=args.mode, approval_handler=approval_handler)
     if args.task:
         agent.run(args.task, max_steps=config.max_steps)

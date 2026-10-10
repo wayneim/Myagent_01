@@ -20,10 +20,11 @@ from .tools.registry import ToolRegistry
 from .tools.shell import ShellTool
 
 
-class LocalProcessBackend:
+class LocalProcessBackend:      # 未沙箱化shell后端，兜底，所有调用都需要经过权限审批
     """Unsandboxed fallback. Shell calls must receive explicit approval."""
 
     def run(self, command: str, workspace: Path, timeout_seconds: int) -> ProcessResult:
+        # cwd默认在workspace下工作，但是shell=True允许任意语法，因此真正限制需要权限审批
         completed = subprocess.run(command, cwd=workspace, shell=True, capture_output=True, text=True, timeout=timeout_seconds)
         return ProcessResult(completed.returncode, completed.stdout, completed.stderr, False)
 
@@ -53,7 +54,7 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
         registry.register(tool)
     if config.model.provider == "qwen":
         provider = QwenProvider(config.api_key or "", config.model.base_url, config.model.model)
-    else:
+    else:       # TODO 没有provider应该提示
         provider = MiniMaxProvider(config.api_key or "", config.model.base_url, config.model.model)
     if mode == "plan":
         registry = ToolRegistry()
