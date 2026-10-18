@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import Iterable
 
 from openai import APIError, APITimeoutError, OpenAI
 
-from myagent.protocol import AssistantTurn, ToolCall, ToolResult
+from myagent.protocol import AssistantTurn, Message, ToolCall, ToolResultsMessage, UserMessage
 from myagent.provider import LLMProvider, ProviderError
 
 
@@ -18,24 +19,18 @@ class QwenProvider(LLMProvider):
         self.model = model
         self.max_tokens = max_tokens
         self.client = OpenAI(api_key=api_key, base_url=base_url)
-        self._messages: list[dict[str, object]] = []
 
     def respond(
         self,
         system_prompt: str,
-        messages: Iterable[object],
+        messages: Iterable[Message],
         tool_definitions: list[dict[str, object]],
     ) -> AssistantTurn:
-        if not self._messages:
-            self._messages = [{"role": "system", "content": system_prompt}]
-            self._messages.extend(
-                dict(message) for message in messages if isinstance(message, dict)
-            )
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                messages=self._messages,
+                messages=[{"role": "system", "content": system_prompt}, *self._serialize(messages)],
                 tools=[
                     {
                         "type": "function",
@@ -51,23 +46,10 @@ class QwenProvider(LLMProvider):
         except (APITimeoutError, APIError) as exc:
             raise ProviderError(f"Qwen request failed: {exc}") from exc
 
+        if not response.choices:
+            raise ProviderError("Qwen returned no response choices")
         choice = response.choices[0]
         message = choice.message
-        self._messages.append({
-            "role": "assistant",
-            "content": message.content,
-            "tool_calls": [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.function.name,
-                        "arguments": tc.function.arguments,
-                    },
-                }
-                for tc in (message.tool_calls or [])
-            ] if message.tool_calls else None,
-        })
 
         text_parts: list[str] = []
         calls: list[ToolCall] = []
@@ -75,17 +57,37 @@ class QwenProvider(LLMProvider):
             text_parts.append(message.content)
         if message.tool_calls:
             for tc in message.tool_calls:
+                error = None
                 try:
                     arguments = json.loads(tc.function.arguments)
-                except json.JSONDecodeError:
+                    if not isinstance(arguments, dict):
+                        error = "Tool arguments must be a JSON object"
+                        arguments = {}
+                except (json.JSONDecodeError, TypeError) as exc:
                     arguments = {}
-                calls.append(ToolCall(tc.id, tc.function.name, arguments))
-        return AssistantTurn("\n".join(text_parts), tuple(calls), response)
+                    error = f"Invalid tool JSON: {exc}"
+                calls.append(ToolCall(tc.id, tc.function.name, arguments, parse_error=error))
+        payload = message.model_dump(mode="json", exclude_none=True)
+        return AssistantTurn("\n".join(text_parts), tuple(calls), payload, "qwen")
 
-    def append_tool_results(self, results: Iterable[ToolResult]) -> None:
-        for result in results:
-            self._messages.append({
-                "role": "tool",
-                "tool_call_id": result.call_id,
-                "content": result.content,
-            })
+    def _serialize(self, messages: Iterable[Message]) -> list[dict[str, object]]:
+        history: list[dict[str, object]] = []
+        for message in messages:
+            if isinstance(message, UserMessage):
+                history.append({"role": "user", "content": message.content})
+            elif isinstance(message, AssistantTurn):
+                if message.provider == "qwen" and message.provider_message is not None:
+                    history.append(deepcopy(message.provider_message))
+                else:
+                    payload = {"role": "assistant", "content": message.text or None}
+                    if message.tool_calls:
+                        payload["tool_calls"] = [
+                            {"id": call.call_id, "type": "function", "function": {"name": call.name, "arguments": json.dumps(call.arguments)}}
+                            for call in message.tool_calls
+                        ]
+                    history.append(payload)
+            elif isinstance(message, ToolResultsMessage):
+                history.extend({"role": "tool", "tool_call_id": result.call_id, "content": result.content} for result in message.results)
+            else:
+                raise ProviderError(f"Unsupported session message: {type(message).__name__}")
+        return history

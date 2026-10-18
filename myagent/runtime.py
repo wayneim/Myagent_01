@@ -32,11 +32,11 @@ class LocalProcessBackend:      # 未沙箱化shell后端，兜底，所有调�
 def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", approval_handler: ApprovalHandler | None = None) -> Agent:
     if mode not in {"plan", "build"}:
         raise ValueError(f"Unsupported mode: {mode}")
+    if not config.workspace.is_dir():
+        raise ValueError(f"Workspace directory does not exist: {config.workspace}")
     resolver = WorkspaceResolver(config.workspace)
     rules = [
         PermissionRule("read", "*", PermissionEffect.ALLOW),
-        PermissionRule("shell", "git status*", PermissionEffect.ALLOW),
-        PermissionRule("shell", "git diff*", PermissionEffect.ALLOW),
     ]
     if mode == "build":
         rules.append(PermissionRule("edit", "*", PermissionEffect.ASK))
@@ -47,15 +47,19 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
         permissions,
         max_output_chars=config.max_tool_output_chars,
         workspace_resolver=resolver,
-        sandbox_backend=LocalProcessBackend(),
+        sandbox_backend=LocalProcessBackend() if config.allow_unsandboxed_shell else None,
     )
     registry = ToolRegistry()
-    for tool in (ReadFileTool(), GlobTool(), GrepTool(), EditFileTool(), WriteFileTool(), ApplyPatchTool(), git_status(), git_diff(), ShellTool()):
+    for tool in (ReadFileTool(), GlobTool(), GrepTool(), EditFileTool(), WriteFileTool(), ApplyPatchTool(), git_status(), git_diff()):
         registry.register(tool)
+    if config.allow_unsandboxed_shell:
+        registry.register(ShellTool())
     if config.model.provider == "qwen":
         provider = QwenProvider(config.api_key or "", config.model.base_url, config.model.model)
-    else:       # TODO 没有provider应该提示
+    elif config.model.provider == "minimax":
         provider = MiniMaxProvider(config.api_key or "", config.model.base_url, config.model.model)
+    else:
+        raise ValueError(f"Unsupported provider: {config.model.provider}")
     if mode == "plan":
         registry = ToolRegistry()
         for tool in (ReadFileTool(), GlobTool(), GrepTool(), git_status(), git_diff()):

@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Iterable
 
-from .protocol import AssistantTurn, ToolResult
+from .protocol import AssistantTurn, Message
 
 
 class ProviderError(RuntimeError):
@@ -17,11 +17,7 @@ class LLMProvider(ABC):
     def respond(
         self,
         system_prompt: str,
-        messages: Iterable[object],
+        messages: Iterable[Message],
         tool_definitions: list[dict[str, object]],
     ) -> AssistantTurn:
-        """Return the next normalized assistant turn."""
-
-    @abstractmethod
-    def append_tool_results(self, results: Iterable[ToolResult]) -> None:
-        """Record results in the provider-specific conversation state."""
+        """Translate the complete session history and return a turn without storing history."""

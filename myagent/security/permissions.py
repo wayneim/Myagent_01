@@ -47,6 +47,8 @@ class PermissionEngine:
         effect = PermissionEffect.ASK
         for rule in self._rules:
             if rule.action in ("*", action) and fnmatch(resource, rule.resource):
+                if rule.effect is PermissionEffect.DENY:
+                    return False
                 effect = rule.effect
         if effect is PermissionEffect.ALLOW:
             return True

@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from myagent.providers.qwen import QwenProvider
-from myagent.protocol import ToolResult
+from myagent.protocol import ToolResult, ToolResultsMessage, UserMessage
 
 
 def test_qwen_provider_converts_tool_definitions() -> None:
@@ -21,7 +21,7 @@ def test_qwen_provider_converts_tool_definitions() -> None:
         provider = QwenProvider("test-key", "http://localhost", "qwen-plus")
         provider.respond(
             "system prompt",
-            [{"role": "user", "content": "hello"}],
+            [UserMessage("hello")],
             [
                 {
                     "name": "read_file",
@@ -52,7 +52,7 @@ def test_qwen_provider_parses_tool_calls() -> None:
         mock_client.chat.completions.create.return_value = mock_response
 
         provider = QwenProvider("test-key", "http://localhost", "qwen-plus")
-        turn = provider.respond("system", [{"role": "user", "content": "read"}], [])
+        turn = provider.respond("system", [UserMessage("read")], [])
 
         assert len(turn.tool_calls) == 1
         assert turn.tool_calls[0].call_id == "call_123"
@@ -68,15 +68,17 @@ def test_qwen_provider_appends_tool_results() -> None:
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "done"
         mock_response.choices[0].message.tool_calls = None
+        mock_response.choices[0].message.model_dump.return_value = {"role": "assistant", "content": "done"}
         mock_client.chat.completions.create.return_value = mock_response
 
         provider = QwenProvider("test-key", "http://localhost", "qwen-plus")
-        provider.respond("system", [{"role": "user", "content": "test"}], [])
-        provider.append_tool_results([ToolResult("call_123", "file content")])
-
-        assert provider._messages[-1]["role"] == "tool"
-        assert provider._messages[-1]["tool_call_id"] == "call_123"
-        assert provider._messages[-1]["content"] == "file content"
+        turn = provider.respond("system", [UserMessage("test")], [])
+        history = [UserMessage("test"), turn, ToolResultsMessage((ToolResult("call_123", "file content"),))]
+        provider.respond("system", history, [])
+        message = mock_client.chat.completions.create.call_args.kwargs["messages"][-1]
+        assert message["role"] == "tool"
+        assert message["tool_call_id"] == "call_123"
+        assert message["content"] == "file content"
 
 
 def test_qwen_provider_includes_system_message() -> None:
@@ -90,7 +92,8 @@ def test_qwen_provider_includes_system_message() -> None:
         mock_client.chat.completions.create.return_value = mock_response
 
         provider = QwenProvider("test-key", "http://localhost", "qwen-plus")
-        provider.respond("system prompt", [{"role": "user", "content": "hello"}], [])
+        provider.respond("system prompt", [UserMessage("hello")], [])
 
-        assert provider._messages[0]["role"] == "system"
-        assert provider._messages[0]["content"] == "system prompt"
+        message = mock_client.chat.completions.create.call_args.kwargs["messages"][0]
+        assert message["role"] == "system"
+        assert message["content"] == "system prompt"

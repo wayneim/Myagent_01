@@ -32,3 +32,6 @@ class ApplyPatchTool(Tool):
 
     def resource(self, arguments: dict[str, Any]) -> str:
         return ",".join(str(item.get("path", "")) for item in arguments.get("operations", []))
+
+    def resources(self, arguments: dict[str, Any]) -> list[str]:
+        return [str(item.get("path", "")) for item in arguments.get("operations", [])]

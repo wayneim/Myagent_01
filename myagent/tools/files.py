@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import fnmatch
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from .base import ExecutionContext, Tool, ToolSpec
 from myagent.protocol import ToolResult
@@ -17,6 +16,14 @@ def _resolver(context: ExecutionContext) -> WorkspaceResolver:
     if resolver is None:
         resolver = WorkspaceResolver(Path(context.workspace))
     return resolver
+
+
+def _search_files(context: ExecutionContext, pattern: str) -> Iterator[Path]:
+    resolver = _resolver(context)
+    for path in resolver.iter_files(pattern):
+        # Authorizing the query does not authorize every file it happens to match.
+        if context.permission_engine.check("read", str(path.relative_to(resolver.root))):
+            yield path
 
 
 class ReadFileTool(Tool):
@@ -41,10 +48,19 @@ class GlobTool(Tool):
     spec = ToolSpec("glob", "Find workspace files matching a glob pattern.", {"type": "object", "properties": {"pattern": {"type": "string"}}, "required": ["pattern"]}, "read", True, True)
 
     def execute(self, call_id: str, arguments: dict[str, Any], context: ExecutionContext) -> ToolResult:
-        pattern = arguments.get("pattern", "**/*")
-        root = Path(context.workspace)
-        paths = [str(path.relative_to(root)) for path in root.glob(pattern) if path.is_file()]
-        return ToolResult(call_id, "\n".join(paths)[: context.max_output_chars])
+        try:
+            resolver = _resolver(context)
+            paths: list[str] = []
+            size = 0
+            for path in _search_files(context, arguments.get("pattern", "**/*")):
+                relative = str(path.relative_to(resolver.root))
+                paths.append(relative)
+                size += len(relative) + 1
+                if len(paths) >= context.max_search_results or size >= context.max_output_chars:
+                    return ToolResult(call_id, "\n".join(paths)[: context.max_output_chars], metadata={"truncated": True})
+            return ToolResult(call_id, "\n".join(paths))
+        except (OSError, ValueError, KeyError) as exc:
+            return ToolResult(call_id, f"glob failed: {exc}", True)
 
     def resource(self, arguments: dict[str, Any]) -> str:
         return arguments.get("pattern", "*")
@@ -54,20 +70,33 @@ class GrepTool(Tool):
     spec = ToolSpec("grep", "Search workspace text files with a regular expression.", {"type": "object", "properties": {"pattern": {"type": "string"}, "glob": {"type": "string"}}, "required": ["pattern"]}, "read", True, True)
 
     def execute(self, call_id: str, arguments: dict[str, Any], context: ExecutionContext) -> ToolResult:
-        expression = re.compile(arguments["pattern"])
-        root = Path(context.workspace)
-        file_pattern = arguments.get("glob", "**/*")
-        matches: list[str] = []
-        for path in root.glob(file_pattern):
-            if not path.is_file():
-                continue
-            try:
-                for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-                    if expression.search(line):
-                        matches.append(f"{path.relative_to(root)}:{number}:{line}")
-            except (OSError, UnicodeDecodeError):
-                continue
-        return ToolResult(call_id, "\n".join(matches)[: context.max_output_chars])
+        try:
+            expression = re.compile(arguments["pattern"])
+            resolver = _resolver(context)
+            matches: list[str] = []
+            size = 0
+            for index, path in enumerate(_search_files(context, arguments.get("glob", "**/*"))):
+                if index >= context.max_search_files:
+                    return ToolResult(call_id, "\n".join(matches), metadata={"truncated": True})
+                try:
+                    if path.stat().st_size > context.max_search_file_bytes:
+                        continue
+                    with path.open("rb") as stream:
+                        if b"\x00" in stream.read(8_192):
+                            continue
+                    with path.open(encoding="utf-8") as stream:
+                        for number, line in enumerate(stream, 1):
+                            if expression.search(line):
+                                match = f"{path.relative_to(resolver.root)}:{number}:{line.rstrip()[:1_000]}"
+                                matches.append(match)
+                                size += len(match) + 1
+                                if len(matches) >= context.max_search_results or size >= context.max_output_chars:
+                                    return ToolResult(call_id, "\n".join(matches)[: context.max_output_chars], metadata={"truncated": True})
+                except (OSError, UnicodeDecodeError):
+                    continue
+            return ToolResult(call_id, "\n".join(matches))
+        except (OSError, ValueError, KeyError, re.error) as exc:
+            return ToolResult(call_id, f"grep failed: {exc}", True)
 
     def resource(self, arguments: dict[str, Any]) -> str:
         return arguments.get("glob", "*")

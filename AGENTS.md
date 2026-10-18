@@ -1,155 +1,77 @@
 # MyAgent Development Handoff
 
-## Project Goal
+## Goal and baseline
 
-MyAgent is an extensible local coding agent inspired by Codex, Claude Code, and OpenCode. It is implemented in Python. Phase 1 starts with MiniMax through its Anthropic-compatible API and must keep provider, tool, permission, sandbox, session, and UI implementations replaceable.
+MyAgent is a Python learning project for building a minimal local coding agent and understanding its mechanisms. First stabilize one agent, then add one teachable mechanism at a time.
 
-The detailed architecture and phased plan are in `Myagent_plan.md`. Treat that file as the product and architecture baseline.
+`Myagent_plan.md` is the current product and architecture baseline. The former platform plan is preserved in `docs/archive/Myagent_plan_before_learning_mvp.md` for reference; it does not override the new milestone scope.
 
-## Repository State
+## Workspace and environment
 
-- Repository root: `D:\testDevelop\AiTest01\Myagent_01`
-- Branch: `main`
-- Remote: `origin` -> `https://github.com/wayneim/Myagent_01.git`
-- Latest committed revision: `079c94e 9/20初版计划`
-- Current implementation files are untracked and have not been committed or pushed.
-- Do not reset, checkout, delete, or overwrite unrelated user work.
-- Do not commit or push unless the user explicitly asks.
+- Repository: `D:\Develop\Project\Myagent_01`
+- Remote: `https://github.com/wayneim/Myagent_01.git`
+- Baseline before S1: `8fc6ab5` on `main`; consult git log/status for the current revision and working changes.
+- User-installed Python: `D:\Develop\Environment\python\python.exe` (3.15.0).
+- Project virtual environment: `venv`, not `.venv`.
+- Use `venv\Scripts\python.exe` explicitly. An existing terminal may still have the old PATH.
+- Dependencies are installed with `venv\Scripts\python.exe -m pip install -e ".[dev]"`.
+- Never reset, delete or overwrite unrelated user work. Do not commit or push without explicit instruction.
 
-## Current Structure
+## Current milestone
 
-```text
-Myagent_01/
-├── AGENTS.md                 # This handoff document
-├── Myagent_plan.md           # Architecture and implementation plan
-├── pyproject.toml            # Python package metadata and dependencies
-├── README.md                 # Basic setup instructions
-├── .env.example              # MiniMax and workspace environment variables
-├── .gitignore
-├── main.py                   # CLI entry point
-├── myagent/
-│   ├── protocol.py           # Provider-independent messages, tool calls, events
-│   ├── config.py             # AgentConfig and ModelProfile
-│   ├── provider.py           # LLMProvider abstraction
-│   ├── core.py               # Provider/tool-independent Agent loop
-│   ├── session.py            # In-memory Session and SessionStore
-│   ├── runtime.py            # Default dependency composition
-│   ├── providers/
-│   │   ├── minimax.py        # MiniMax Anthropic-compatible provider
-│   │   └── qwen.py           # Qwen OpenAI-compatible provider
-│   ├── security/
-│   │   ├── permissions.py    # allow/ask/deny rules and CLI approval handler
-│   │   ├── sandbox.py        # SandboxBackend abstraction
-│   │   └── workspace.py      # Workspace path and sensitive-file checks
-│   ├── tools/
-│   │   ├── base.py           # ToolSpec, Tool, ExecutionContext
-│   │   ├── registry.py       # Tool discovery and model definitions
-│   │   ├── files.py          # read_file, glob, grep, edit_file, write_file
-│   │   ├── patch.py          # Simplified structured apply_patch
-│   │   ├── git.py            # git_status and git_diff
-│   │   └── shell.py          # Shell tool using injectable backend
-│   └── cli/
-│       └── repl.py           # Interactive CLI with plan/build modes
-└── tests/
-    ├── test_approval.py      # CLI approval behavior
-    ├── test_workspace.py
-    ├── test_permissions.py
-    ├── test_runtime.py       # Runtime tool exposure by mode
-    ├── test_tools.py
-    └── test_core.py
-```
+S0 and S1 implement the development environment and a reliable offline single-agent loop:
 
-## Completed Work
+- `protocol.py`: UserMessage, AssistantTurn, ToolCall, ToolResult, ToolResultsMessage, events and responses.
+- `session.py`: Session owns the complete transcript; SessionStore retains and retrieves sessions in memory.
+- `core.py`: orchestrates model/tool turns, stores both assistant and tool messages, bounds steps and handles ProviderError/cancellation.
+- `providers/minimax.py` and `providers/qwen.py`: rebuild requests from the supplied transcript; they do not cache conversation history. Original assistant payloads are JSON dictionaries, preserving required protocol blocks and IDs.
+- `tools/executor.py`: validates JSON Schema, checks every declared resource through PermissionEngine, executes and normalizes errors/output limits.
+- `security/permissions.py`: matching deny wins over allow; among other matching rules the last match wins. CLI approvals remain one-time.
+- `security/workspace.py` and file search tools: enforce workspace/sensitive paths for searches and direct reads; searches also check each matched file's read permission.
+- `runtime.py`: plan mode exposes inspection tools; build adds editing tools. Local Shell is registered only with explicit opt-in.
+- `cli/repl.py`: followups share a session; :new isolates a new conversation. One-shot failures return nonzero status; JSON mode is noninteractive and one-shot only.
 
-- Created Python package structure and `pyproject.toml`.
-- Added the internal protocol types: `ToolCall`, `ToolResult`, `AssistantTurn`, `AgentEvent`, and `AgentResponse`.
-- Added `LLMProvider`, `Tool`, `ToolRegistry`, `PermissionEngine`, and `SandboxBackend` extension seams.
-- Added workspace boundary enforcement and basic `.env` protection.
-- Added built-in file read/search/edit/write, simple structured patch, Git status/diff, and Shell tools.
-- Added MiniMax provider using the Anthropic SDK and Anthropic-compatible MiniMax endpoint.
-- Added an Agent loop that depends on the provider and tool interfaces, not MiniMax directly.
-- Added CLI event rendering, JSON event output, and a terminal-backed one-time approval prompt for `ask` permissions.
-- Added `--mode plan|build`: `plan` exposes only read and Git inspection tools; `build` exposes all tools and asks before edits or non-Git shell commands.
-- Wired `AgentConfig.max_steps` into CLI task execution.
-- Added tests for workspace escape, permissions, exact replacement, FakeProvider-driven Agent execution, CLI approval, and runtime mode tool exposure.
-- Added Qwen Provider using the OpenAI SDK and OpenAI-compatible Qwen endpoint.
-- Added provider selection via `MYAGENT_PROVIDER` environment variable (`minimax` or `qwen`).
-- Added Qwen Provider contract tests using mocked OpenAI responses.
-- Installed development dependencies and verified `python -m compileall myagent main.py` and `python -m pytest`; the suite currently has 14 passing tests.
-- Migrated mistakenly created source files from `D:\testDevelop\AiTest01\myagent` into this repository. The source of truth is now this repository's `myagent/` directory.
+## Verified on 2026-10-18
 
-## Important Current Limitations
+- `venv\Scripts\python.exe -m pytest -q`: **56 passed, 1 skipped**.
+- The skipped test requires permission to create Windows symbolic links. Do not claim it passed.
+- `venv\Scripts\python.exe -m pip check`: no broken requirements.
+- `venv\Scripts\python.exe -m compileall -q myagent main.py`: passed.
+- `venv\Scripts\python.exe main.py --help`: passed.
+- `tests/test_provider_contract.py` exercises real SDK response models with mocked network calls for both providers, including replay, isolation and error mapping.
+- `tests/test_workflow.py` uses scripted model decisions, real file tools and local Python assertions. It verifies read -> failing check -> failed edit -> corrected edit -> passing check -> followup.
+- No real MiniMax or Qwen API call was performed. Do not infer real model success from scripted tests.
 
-### Verification
+## Development rules
 
-- Development dependencies are installed with `python -m pip install -e ".[dev]"`.
-- The latest verification passed: `python -m compileall myagent main.py` and `python -m pytest` (`10 passed`).
-- Real MiniMax API integration remains unverified because no API key has been used.
-
-### Security
-
-- `myagent.runtime.LocalProcessBackend` uses `subprocess.run(..., shell=True)` and returns `sandboxed=False`.
-- It is intentionally an unsandboxed fallback, not a security boundary.
-- Interactive CLI runs use `CliApprovalHandler`, which prompts for one-time approval of `ask` actions. JSON event mode remains non-interactive and rejects them by default.
-- Windows OS-level restricted process/container sandboxing is not implemented.
-- The runtime has no network enforcement; `MYAGENT_NETWORK_MODE` is configuration only at this point.
-
-### Agent and Session
-
-- Session storage is in memory only.
-- No persisted session, resume, cancellation command, token/cost budgets, context compaction, repeated-call detection, or parallel read-only scheduling yet.
-- The Agent loop returns normalized tool results to the provider but does not yet have robust provider message replay or a Provider contract test suite.
-
-### Provider
-
-- MiniMax real API integration has not been run with an API key.
-- Qwen real API integration has not been run with an API key.
-- Streaming, retry policy, rate-limit mapping, and non-native text-tool protocols are not implemented.
-- Provider selection is configured via `MYAGENT_PROVIDER` environment variable.
-
-### Tools
-
-- `apply_patch` accepts a list of `edit` and `write` operations. It is not a unified-diff parser and is not transactional across files.
-- File edits do not yet check content hashes or detect concurrent file changes.
-- `glob` and `grep` need stronger result limits, binary-file handling, and resolver-based sensitive-path enforcement.
-- Git tools only expose status and unstaged diff.
-
-### CLI
-
-- `--mode plan` limits the registry to `read_file`, `glob`, `grep`, `git_status`, and `git_diff`.
-- `--mode build` exposes the full registry; edits and ordinary shell commands require one-time approval.
-- No task cancellation, retry, session resume, or pre-exit change summary.
-- JSON event output exists via `--json-events`, but events are not persisted.
-
-## Development Rules
-
-- Keep `Agent` dependent only on internal protocols and interfaces. Do not import MiniMax SDK types in `core.py`.
-- Add providers through `LLMProvider`; do not add provider-specific branches in Agent Core.
-- Add tools through `Tool` and `ToolRegistry`; do not add hard-coded tool-name branches in Agent Core.
-- All permission decisions must go through `PermissionEngine`.
-- All Shell execution must go through a `SandboxBackend`; never claim the current local backend is sandboxed.
-- Keep the MiniMax provider on native Anthropic-compatible tool calls by default. Text/XML tool-call parsing is a provider-specific fallback, not a generic regex scan.
-- Preserve `call_id` and required provider tool-result sequencing.
+- Keep Agent dependent on internal protocols/interfaces; no SDK types or provider-specific branches in Core.
+- Add providers through LLMProvider, tools through Tool/ToolRegistry; do not dispatch by hard-coded tool names in Core.
+- Session is the source of truth. Provider clients may be shared, conversation history may not be hidden in providers.
+- Preserve call_id and protocol-required assistant/result ordering. Cancellation must close declared tool batches.
+- Native tools are the default. Provider-specific text/XML parsing is a separately enabled fallback, never a generic regex scan over model text.
+- All authorization goes through PermissionEngine; compound tools expose every target with resources(). Search results need per-file authorization too.
+- All Shell execution goes through SandboxBackend. LocalProcessBackend is unsandboxed; never describe cwd, approval prompts or path filters as OS isolation.
+- Shell is disabled by default. `--allow-unsandboxed-shell` enables local execution with one-time approval for every command.
+- Current local execution has no network enforcement or environment isolation. network_mode is configuration only.
 - Prefer exact replacements for small edits and structured patches for multi-file changes.
-- Check `git status` before and after substantive work. Do not commit or push without explicit user instruction.
+- Use FakeProviders and scratch workspaces for reproducible regression tests. Do not load real secrets or invoke paid APIs for routine tests.
+- Check git status before and after substantive work. No unsolicited commit, push, multi-agent delegation or recurring automation.
 
-## Recommended Next Steps
+## Remaining limitations
 
-1. Improve the execution boundary: add a Windows-capable sandbox backend or make unsandboxed mode opt-in with prominent warnings.
-2. Make `apply_patch` atomic or return a preflight failure before changing any file.
-3. Add persisted session/event storage with Git baseline capture.
-4. Add MiniMax Provider contract tests using mocked Anthropic responses, then verify a real API call only after `MINIMAX_API_KEY` is configured.
-5. Implement streaming and robust error/retry handling before adding DeepSeek or text-based tool-call protocols.
-6. Add task cancellation, retry, session resume, and pre-exit change summaries to the CLI.
+- Sessions/events are memory-only; no disk resume, compaction, durable memory or token/cost accounting.
+- No streaming, explicit application retry policy, repeated-call detection, background jobs, scheduler or team runtime.
+- Ctrl+C is normalized by Core, but local subprocess cancellation does not yet guarantee termination of the entire process tree.
+- apply_patch still applies operations sequentially. A later preflight/I/O failure may leave earlier edits in place; it is not transactional.
+- File writes lack expected-hash conflict detection and use a fixed temporary filename.
+- Searches skip common generated directories, binary-looking files and oversized grep files, but do not implement full gitignore support or regex CPU timeouts.
+- Per-tool output truncation is not a complete context-management system; large reads and subprocess capture still need work.
+- SDK/default model compatibility requires a separately configured real-provider smoke run.
 
-## Useful Commands
+## Next step: S2 single-agent MVP
 
-```powershell
-git status --short
-python -m pytest
-python main.py --help
-python main.py --workspace . --mode plan "Inspect this project"
-python main.py --workspace . --mode build "Inspect this project and run tests"
-```
-
-For a real MiniMax session, configure `MINIMAX_API_KEY` in the environment. For Qwen, set `MYAGENT_PROVIDER=qwen` and `QWEN_API_KEY`. Do not commit `.env`.
+1. Load bounded workspace/project instructions and include OS/Shell/workspace facts in prompt assembly.
+2. Add unique atomic-write temporaries, expected-content hashes and full patch preflight before writes.
+3. Capture Git baseline and summarize this task's changes without resetting existing user work.
+4. Validate one configured real provider in a disposable exercise repository, then address actual timeout/truncation/retry issues observed.
+5. Advance to Hooks/Todo/Skills only after that coding MVP is understood and verified. Follow the full staged plan for later mechanisms.

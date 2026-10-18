@@ -9,7 +9,7 @@ from myagent.protocol import ToolResult
 
 
 class ShellTool(Tool):
-    spec = ToolSpec("bash", "Run a command in the workspace sandbox.", {"type": "object", "properties": {"command": {"type": "string"}, "timeout_seconds": {"type": "integer"}}, "required": ["command"]}, "shell")
+    spec = ToolSpec("bash", "Run a command in the workspace using the configured process backend. The local backend is NOT sandboxed. On Windows it uses cmd.exe syntax.", {"type": "object", "properties": {"command": {"type": "string", "minLength": 1}, "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 300}}, "required": ["command"]}, "shell")
 
     def execute(self, call_id: str, arguments: dict[str, Any], context: ExecutionContext) -> ToolResult:
         backend = getattr(context, "sandbox_backend", None)

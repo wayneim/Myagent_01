@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from myagent.config import AgentConfig
@@ -19,36 +20,58 @@ def _print_event(event: AgentEvent) -> None:
         print(f"[tool] {event.data['name']}")
     elif event.type is EventType.TOOL_COMPLETED:
         print(f"[tool result] {event.data['content']}")
-    elif event.type is EventType.ERROR:
+    elif event.type in {EventType.ERROR, EventType.TASK_CANCELLED}:
         print(f"[error] {event.data['message']}")
 
 
-def main() -> None:
+def main() -> int:
     parser = argparse.ArgumentParser(description="MyAgent coding assistant")
     parser.add_argument("task", nargs="?", help="One-shot task")                # 可选的一次性任务指令，提供则执行完退出，不进入循环
     parser.add_argument("--workspace", type=Path, default=None)
     parser.add_argument("--json-events", action="store_true")                   # 开启后所有事件输出 JSON 格式
     parser.add_argument("--mode", choices=("plan", "build"), default="build")   # 运行模式
+    parser.add_argument("--allow-unsandboxed-shell", action="store_true", help="Enable the local shell without OS isolation; each call still requires approval")
     args = parser.parse_args()
-    config = AgentConfig.from_environment(args.workspace)
+    if args.json_events and not args.task:
+        parser.error("--json-events requires a one-shot task")
     # 打印事件
     handler = lambda event: print(json.dumps({"type": event.type.value, "data": event.data}, default=str)) if args.json_events else _print_event(event)
     approval_handler = None if args.json_events else CliApprovalHandler()       # None，意味着不提示用户审批，所有需要审批的操作（如写文件、执行 shell）会被默认拒绝。否则创建 CliApprovalHandler，终端会弹出 allow/ask/deny 的交互式确认提示。
-    agent = build_agent(config, handler, mode=args.mode, approval_handler=approval_handler)
+    try:
+        config = replace(AgentConfig.from_environment(args.workspace), allow_unsandboxed_shell=args.allow_unsandboxed_shell)
+        agent = build_agent(config, handler, mode=args.mode, approval_handler=approval_handler)
+    except ValueError as exc:
+        handler(AgentEvent(EventType.ERROR, {"message": str(exc)}))
+        return 2
+    if args.allow_unsandboxed_shell and args.mode == "build":
+        warning = "Local shell enabled: NO OS isolation; filesystem, network and inherited environment are unrestricted."
+        if args.json_events:
+            print(json.dumps({"type": "warning", "data": {"message": warning}}))
+        else:
+            print(f"[warning] {warning}")
     if args.task:
-        agent.run(args.task, max_steps=config.max_steps)
-        return
+        response = agent.run(args.task, max_steps=config.max_steps)
+        return 0 if response.completed else 1
+    session = agent.new_session()
+    print("Commands: :new (new conversation), :help, :quit")
     while True:
         try:
             task = input("myagent> ").strip()
         except (EOFError, KeyboardInterrupt):
             print()
-            return
+            return 0
         if task in {":q", ":quit", ":exit"}:
-            return
+            return 0
+        if task == ":new":
+            session = agent.new_session()
+            print("Started a new conversation.")
+            continue
+        if task == ":help":
+            print("Commands: :new (new conversation), :help, :quit")
+            continue
         if task:
-            agent.run(task, max_steps=config.max_steps)
+            agent.run(task, max_steps=config.max_steps, session_id=session.session_id)
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

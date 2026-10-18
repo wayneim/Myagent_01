@@ -15,8 +15,8 @@ class ModelProfile:
     model: str
     base_url: str
     supports_native_tools: bool = True
-    supports_streaming: bool = True
-    supports_parallel_tools: bool = True
+    supports_streaming: bool = False
+    supports_parallel_tools: bool = False
     text_tool_protocol: str | None = None
 
 
@@ -28,20 +28,23 @@ class AgentConfig:
     max_steps: int = 20
     max_tool_output_chars: int = 20_000
     network_mode: str = "deny"
+    allow_unsandboxed_shell: bool = False
 
     @classmethod
     def from_environment(cls, workspace: Path | None = None) -> "AgentConfig":
         load_dotenv()
         resolved_workspace = (workspace or Path(os.getenv("MYAGENT_WORKSPACE", "."))).resolve()
-        provider = os.getenv("MYAGENT_PROVIDER", "minimax")  # TODO 没有provider应该提示配置
+        provider = os.getenv("MYAGENT_PROVIDER", "minimax").strip().lower()
         if provider == "qwen":
             api_key = os.getenv("QWEN_API_KEY")
             model = os.getenv("QWEN_MODEL", "qwen-plus")
             base_url = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-        else: # TODO 应该用elif去增加provider选择，不用默认minimax
+        elif provider == "minimax":
             api_key = os.getenv("MINIMAX_API_KEY")
             model = os.getenv("MINIMAX_MODEL", "MiniMax-M3")
             base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.cn/anthropic")
+        else:
+            raise ValueError(f"Unsupported provider: {provider}. Choose minimax or qwen.")
         return cls(
             workspace=resolved_workspace,
             api_key=api_key,

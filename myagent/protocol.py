@@ -14,6 +14,7 @@ class EventType(str, Enum):
     PERMISSION_REQUESTED = "permission_requested"
     TOOL_COMPLETED = "tool_completed"
     TASK_COMPLETED = "task_completed"
+    TASK_CANCELLED = "task_cancelled"
     ERROR = "error"
 
 
@@ -23,6 +24,7 @@ class ToolCall:
     name: str
     arguments: dict[str, Any]
     protocol: str = "native"
+    parse_error: str | None = None
 
 
 @dataclass(frozen=True)
@@ -37,7 +39,22 @@ class ToolResult:
 class AssistantTurn:
     text: str = ""
     tool_calls: tuple[ToolCall, ...] = ()
-    provider_message: Any = None
+    # JSON-compatible payload, never an SDK object. Preserve opaque blocks for replay.
+    provider_message: dict[str, Any] | None = None
+    provider: str | None = None
+
+
+@dataclass(frozen=True)
+class UserMessage:
+    content: str
+
+
+@dataclass(frozen=True)
+class ToolResultsMessage:
+    results: tuple[ToolResult, ...]
+
+
+Message = UserMessage | AssistantTurn | ToolResultsMessage
 
 
 @dataclass(frozen=True)
@@ -50,3 +67,4 @@ class AgentEvent:
 class AgentResponse:
     text: str
     completed: bool = True
+    session_id: str | None = None
