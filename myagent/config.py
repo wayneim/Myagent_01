@@ -8,16 +8,14 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from .providers.registry import provider_registry
+
 
 @dataclass(frozen=True)
 class ModelProfile:
     provider: str
     model: str
     base_url: str
-    supports_native_tools: bool = True
-    supports_streaming: bool = False
-    supports_parallel_tools: bool = False
-    text_tool_protocol: str | None = None
 
 
 @dataclass(frozen=True)
@@ -27,28 +25,20 @@ class AgentConfig:
     api_key: str | None
     max_steps: int = 20
     max_tool_output_chars: int = 20_000
-    network_mode: str = "deny"
-    allow_unsandboxed_shell: bool = False
+    allow_unsandboxed_shell: bool = False   # 显式启用本地未沙箱化 Shell
 
     @classmethod
     def from_environment(cls, workspace: Path | None = None) -> "AgentConfig":
         load_dotenv()
         resolved_workspace = (workspace or Path(os.getenv("MYAGENT_WORKSPACE", "."))).resolve()
         provider = os.getenv("MYAGENT_PROVIDER", "minimax").strip().lower()
-        if provider == "qwen":
-            api_key = os.getenv("QWEN_API_KEY")
-            model = os.getenv("QWEN_MODEL", "qwen-plus")
-            base_url = os.getenv("QWEN_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1")
-        elif provider == "minimax":
-            api_key = os.getenv("MINIMAX_API_KEY")
-            model = os.getenv("MINIMAX_MODEL", "MiniMax-M3")
-            base_url = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.cn/anthropic")
-        else:
-            raise ValueError(f"Unsupported provider: {provider}. Choose minimax or qwen.")
+        spec = provider_registry.get(provider)
+        api_key = os.getenv(spec.api_key_env)
+        model = os.getenv(f"{spec.env_prefix}_MODEL", spec.default_model)
+        base_url = os.getenv(f"{spec.env_prefix}_BASE_URL", spec.default_base_url)
         return cls(
             workspace=resolved_workspace,
             api_key=api_key,
-            network_mode=os.getenv("MYAGENT_NETWORK_MODE", "deny"),  # 后续用来支持网络访问控制
             model=ModelProfile(
                 provider=provider,
                 model=model,

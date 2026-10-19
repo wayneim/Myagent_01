@@ -30,6 +30,10 @@ python -m venv venv
 - MiniMax：`MYAGENT_PROVIDER=minimax`，设置 `MINIMAX_API_KEY`，按所用模型配置 `MINIMAX_MODEL`、`MINIMAX_BASE_URL`。
 - Qwen：`MYAGENT_PROVIDER=qwen`，设置 `QWEN_API_KEY`，可设置 `QWEN_MODEL`、`QWEN_BASE_URL`。
 
+未指定 `MYAGENT_PROVIDER` 时默认使用 MiniMax，不会根据其他厂商的 Key 自动切换。所选厂商的 Key 未配置或只有空白时，启动会提示 `.env` / 环境变量配置方式并以状态码 2 退出，不发送模型请求。模型名和地址也不能为空。
+
+新增厂商时，实现 `LLMProvider`，在 `myagent/providers/registry.py` 注册 `ProviderSpec`（厂商名、环境变量前缀、默认模型、默认地址和工厂路径）。配置加载和运行时创建共用注册表，无需修改 Core 或增加厂商判断分支。配置的模型必须支持当前适配器使用的原生工具调用协议；程序不会自动检测模型能力。流式和文本工具协议尚未实现。
+
 模型名和端点沿用项目配置，真实 API 兼容性尚需配置密钥后验证。
 
 ```powershell
@@ -52,7 +56,7 @@ Shell 默认关闭。需要运行命令时，请在练习工作区显式启用�
 ```
 
 本地后端使用 `subprocess`，不隔离文件系统、网络或继承的环境变量。Windows 使用 cmd.exe 语法。
-每个命令都需本次审批；配置中的 network_mode 当前不执行网络限制。
+每个命令都需本次审批。
 JSON 事件模式只接受一次性任务，不进行交互审批，需审批的操作默认拒绝：
 
 ```powershell

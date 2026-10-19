@@ -7,8 +7,7 @@ from pathlib import Path
 
 from .config import AgentConfig
 from .core import Agent
-from .providers.minimax import MiniMaxProvider
-from .providers.qwen import QwenProvider
+from .providers.registry import provider_registry
 from .security.permissions import ApprovalHandler, PermissionEffect, PermissionEngine, PermissionRule
 from .security.sandbox import ProcessResult
 from .security.workspace import WorkspaceResolver
@@ -34,6 +33,7 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
         raise ValueError(f"Unsupported mode: {mode}")
     if not config.workspace.is_dir():
         raise ValueError(f"Workspace directory does not exist: {config.workspace}")
+    provider = provider_registry.create(config)
     resolver = WorkspaceResolver(config.workspace)
     rules = [
         PermissionRule("read", "*", PermissionEffect.ALLOW),
@@ -54,12 +54,6 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
         registry.register(tool)
     if config.allow_unsandboxed_shell:
         registry.register(ShellTool())
-    if config.model.provider == "qwen":
-        provider = QwenProvider(config.api_key or "", config.model.base_url, config.model.model)
-    elif config.model.provider == "minimax":
-        provider = MiniMaxProvider(config.api_key or "", config.model.base_url, config.model.model)
-    else:
-        raise ValueError(f"Unsupported provider: {config.model.provider}")
     if mode == "plan":
         registry = ToolRegistry()
         for tool in (ReadFileTool(), GlobTool(), GrepTool(), git_status(), git_diff()):

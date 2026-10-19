@@ -26,7 +26,7 @@ def test_build_mode_exposes_edits_but_shell_is_opt_in(tmp_path: Path) -> None:
 
 
 def test_local_shell_requires_explicit_opt_in_and_each_command_approval(tmp_path):
-    with patch("myagent.runtime.MiniMaxProvider"):
+    with patch("myagent.providers.minimax.MiniMaxProvider"):
         agent = build_agent(replace(_config(tmp_path), allow_unsandboxed_shell=True))
     assert agent.tools.get("bash") is not None
     assert agent.execution_context.sandbox_backend is not None

@@ -52,7 +52,7 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 - All authorization goes through PermissionEngine; compound tools expose every target with resources(). Search results need per-file authorization too.
 - All Shell execution goes through SandboxBackend. LocalProcessBackend is unsandboxed; never describe cwd, approval prompts or path filters as OS isolation.
 - Shell is disabled by default. `--allow-unsandboxed-shell` enables local execution with one-time approval for every command.
-- Current local execution has no network enforcement or environment isolation. network_mode is configuration only.
+- Current local execution has no network enforcement or environment isolation.
 - Prefer exact replacements for small edits and structured patches for multi-file changes.
 - Use FakeProviders and scratch workspaces for reproducible regression tests. Do not load real secrets or invoke paid APIs for routine tests.
 - Check git status before and after substantive work. No unsolicited commit, push, multi-agent delegation or recurring automation.
