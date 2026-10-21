@@ -34,7 +34,10 @@ class CliApprovalHandler(ApprovalHandler):
 
     def approve(self, action: str, resource: str) -> bool:
         self._output(f"Permission required: {action} {resource}")
-        answer = self._input("Allow this action? [y/N] ").strip().lower()
+        try:
+            answer = self._input("Allow this action? [y/N] ").strip().lower()
+        except EOFError:
+            return False
         return answer in {"y", "yes"}
 
 

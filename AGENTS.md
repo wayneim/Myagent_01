@@ -29,7 +29,7 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 - `security/permissions.py`: matching deny wins over allow; among other matching rules the last match wins. CLI approvals remain one-time.
 - `security/workspace.py` and file search tools: enforce workspace/sensitive paths for searches and direct reads; searches also check each matched file's read permission.
 - `runtime.py`: plan mode exposes inspection tools; build adds editing tools. Local Shell is registered only with explicit opt-in.
-- `cli/repl.py`: followups share a session; :new isolates a new conversation. One-shot failures return nonzero status; JSON mode is noninteractive and one-shot only.
+- `cli/repl.py`: followups share a session; :new isolates a new conversation. One-shot failures return nonzero status; JSON mode is one-shot only and defaults to noninteractive approval denial. `--approval-mode interactive` enables one-time terminal approvals on stderr when stdin and stderr are terminals; without a terminal, ASK is denied.
 
 ## Verified on 2026-10-18
 

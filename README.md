@@ -57,11 +57,25 @@ Shell 默认关闭。需要运行命令时，请在练习工作区显式启用�
 
 本地后端使用 `subprocess`，不隔离文件系统、网络或继承的环境变量。Windows 使用 cmd.exe 语法。
 每个命令都需本次审批。
-JSON 事件模式只接受一次性任务，不进行交互审批，需审批的操作默认拒绝：
+JSON 事件模式只接受一次性任务，默认不进行交互审批，需审批的操作默认拒绝：
 
 ```powershell
 .\venv\Scripts\python.exe main.py --json-events --mode plan "解释项目结构"
 ```
+
+输出格式和审批方式可以独立选择。`--approval-mode` 支持：
+
+- `auto`（默认）：普通文本模式询问审批；JSON 模式拒绝需要询问的操作。
+- `interactive`：包括 JSON 模式在内，均可通过终端逐次审批。
+- `deny`：不询问，拒绝所有需要询问的操作；规则明确允许的读取等操作仍可执行。
+
+交互审批要求 stdin 和 stderr 都连接终端；否则不读取输入，需要询问的操作直接拒绝。审批提示写入 stderr，JSON 事件继续写入 stdout。输入 `y` 或 `yes` 仅批准本次操作，其他回答或输入结束（EOF）均拒绝。
+
+```powershell
+.\venv\Scripts\python.exe main.py --json-events --approval-mode interactive "创建一个示例文件" > events.jsonl
+```
+
+该命令将 JSON 事件保存到文件，审批仍在终端进行。不要合并 stderr 到 stdout，否则审批提示会混入 JSON 输出。这是终端审批，尚不提供程序间的 JSON 审批请求/响应协议。
 
 ## 从哪里阅读代码
 
