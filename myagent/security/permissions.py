@@ -15,9 +15,9 @@ class PermissionEffect(str, Enum):
 
 @dataclass(frozen=True)
 class PermissionRule:
-    action: str
-    resource: str
-    effect: PermissionEffect
+    action: str                 # 操作类别（read，write...)
+    resource: str               # 操作目标或匹配模式（README.md,"docs/*"...)
+    effect: PermissionEffect    # 匹配后的处理方式（允许？拒绝？）
 
 
 class ApprovalHandler:

@@ -13,7 +13,7 @@ from myagent.protocol import ToolResult
 class ToolSpec:
     name: str
     description: str
-    parameters: dict[str, Any]
+    parameters: dict[str, Any]      # 要按照json scheme进行编写，方便校验
     action: str
     read_only: bool = False
     supports_parallel: bool = False
@@ -23,7 +23,7 @@ class ToolSpec:
 class ExecutionContext:
     workspace: Any
     permission_engine: Any
-    cancellation_requested: Any = lambda: False
+    cancellation_requested: Any = lambda: False     # 查询“当前任务是否已被请求取消”，暂时没有实际作用
     max_output_chars: int = 20_000
     audit_events: list[dict[str, Any]] = field(default_factory=list) # [] 会让所有实例共享同一个列表，default_factory 确保每个实例创建时都生成新的空列表。
     workspace_resolver: Any = None

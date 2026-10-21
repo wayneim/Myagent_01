@@ -25,7 +25,7 @@ class ToolExecutor:
             tool = self.tools.get(call.name)
             if tool is None:
                 return self._error(call, "unknown_tool", f"Unknown tool: {call.name}")
-            Draft202012Validator(tool.spec.parameters).validate(call.arguments)
+            Draft202012Validator(tool.spec.parameters).validate(call.arguments)     # 校验参数是否正确（是否有必填参数等）
             if not all(self.permissions.check(tool.spec.action, resource) for resource in tool.resources(call.arguments)):
                 return self._error(call, "permission_denied", f"Permission denied: {call.name}")
             result = tool.execute(call.call_id, call.arguments, self.context)

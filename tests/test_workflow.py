@@ -14,7 +14,7 @@ from myagent.tools.shell import ShellTool
 
 def test_read_test_fail_edit_retry_test_pass_and_followup(tmp_path):
     (tmp_path / 'calc.py').write_text('def answer():\n    return 1\n', encoding='utf-8')
-    command = f'"{sys.executable}" -B -c "from calc import answer; assert answer() == 2"'
+    command = f'"{sys.executable}" -B -c "from calc import answer; assert answer() == 2"'   # sys.executable获取当前正在运行的 Python 解释器的绝对路径。
 
     class Approvals(ApprovalHandler):
         def __init__(self):
