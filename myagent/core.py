@@ -38,8 +38,8 @@ class Agent:
         """Pass session_id to continue; omit it to start an isolated session."""
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
-        session = self.session_store.get(session_id) if session_id else self.new_session()
-        if session.workspace != Path(self.execution_context.workspace).resolve():
+        session = self.session_store.get(session_id) if session_id else self.new_session()      # 获取会话
+        if session.workspace != Path(self.execution_context.workspace).resolve():               # 防止把一个工作区的会话，拿到另一个工作区继续执行
             raise ValueError("Session belongs to a different workspace")
         session.messages.append(UserMessage(task))
         self._emit(session, AgentEvent(EventType.TASK_STARTED, {"task": task, "session_id": session.session_id}))
@@ -49,13 +49,16 @@ class Agent:
             if self.execution_context.cancellation_requested():
                 return self._cancelled(session)
             try:
-                turn = self.provider.respond(self.system_prompt, session.messages, self.tools.definitions())
+                turn = self.provider.respond(self.system_prompt, session.messages, self.tools.definitions())    # llm执行
             except ProviderError as exc:
                 return self._failed(session, str(exc))
             except KeyboardInterrupt:
                 return self._cancelled(session)
             session.messages.append(turn)
             self._emit(session, AgentEvent(EventType.ASSISTANT_TURN, {"text": turn.text, "tool_calls": [call.name for call in turn.tool_calls]}))
+                        
+            # TODO：区分模型停止与任务完成，处理无工具调用的空回复、截断等情况。
+            # 详见根目录《待改进.md》的“任务完成判定”。
             if not turn.tool_calls:
                 self._emit(session, AgentEvent(EventType.TASK_COMPLETED, {"text": turn.text}))
                 return AgentResponse(turn.text, session_id=session.session_id)
@@ -66,11 +69,13 @@ class Agent:
                 self._emit(session, AgentEvent(EventType.TOOL_REQUESTED, {"name": call.name, "call_id": call.call_id}))
                 cancelled = cancelled or self.execution_context.cancellation_requested()
                 try:
-                    result = ToolResult(call.call_id, "Task cancelled; tool not executed", True) if cancelled else executor.execute(call)
+                    result = ToolResult(call.call_id, "Task cancelled; tool not executed", True) if cancelled else executor.execute(call)   # 执行工具
                 except KeyboardInterrupt:
                     cancelled = True
                     result = ToolResult(call.call_id, "Task interrupted; side effects may have occurred", True)
                 results.append(result)
+                
+                # TODO 读取文件时会将整个文件输出到终端，考虑是否需要改进
                 self._emit(session, AgentEvent(EventType.TOOL_COMPLETED, {"call_id": result.call_id, "is_error": result.is_error, "content": result.content}))
             # Close every declared call even on cancellation, preserving replay order.
             session.messages.append(ToolResultsMessage(tuple(results)))
@@ -88,6 +93,6 @@ class Agent:
         return AgentResponse("Task cancelled", False, session.session_id)
 
     def _emit(self, session: Session, event: AgentEvent) -> None:
-        session.events.append(event)
+        session.events.append(event)        # 保存事件
         if self.event_handler:
-            self.event_handler(event)
+            self.event_handler(event)       # 打印事件

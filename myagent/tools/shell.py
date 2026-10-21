@@ -8,6 +8,9 @@ from .base import ExecutionContext, Tool, ToolSpec
 from myagent.protocol import ToolResult
 
 
+"""
+Shell 命令执行工具，通过配置的执行后端运行命令，本地后端没有操作系统级隔离
+"""
 class ShellTool(Tool):
     spec = ToolSpec("bash", "Run a command in the workspace using the configured process backend. The local backend is NOT sandboxed. On Windows it uses cmd.exe syntax.", {"type": "object", "properties": {"command": {"type": "string", "minLength": 1}, "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 300}}, "required": ["command"]}, "shell")
 

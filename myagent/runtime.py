@@ -47,7 +47,7 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
         permissions,
         max_output_chars=config.max_tool_output_chars,
         workspace_resolver=resolver,
-        sandbox_backend=LocalProcessBackend() if config.allow_unsandboxed_shell else None,
+        sandbox_backend=LocalProcessBackend() if config.allow_unsandboxed_shell else None,      # 因为当前 Shell 使用的是 LocalProcessBackend，它没有操作系统级隔离，所以项目要求用户显式启用。
     )
     registry = ToolRegistry()
     for tool in (ReadFileTool(), GlobTool(), GrepTool(), EditFileTool(), WriteFileTool(), ApplyPatchTool(), git_status(), git_diff()):

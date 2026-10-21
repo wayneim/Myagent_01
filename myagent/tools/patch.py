@@ -9,6 +9,9 @@ from .files import EditFileTool, WriteFileTool
 from myagent.protocol import ToolResult
 
 
+"""
+补丁工具，按顺序执行一组文件编辑或写入操作，失败时停止，已完成的操作不会回滚
+"""
 class ApplyPatchTool(Tool):
     spec = ToolSpec("apply_patch", "Apply a list of exact file operations.", {"type": "object", "properties": {"operations": {"type": "array", "items": {"type": "object"}}}, "required": ["operations"]}, "edit")
 

@@ -22,18 +22,18 @@ class ToolExecutor:
         try:
             if call.parse_error:
                 return self._error(call, "invalid_arguments", call.parse_error)
-            tool = self.tools.get(call.name)
+            tool = self.tools.get(call.name)                                                                                # 获取工具
             if tool is None:
                 return self._error(call, "unknown_tool", f"Unknown tool: {call.name}")
-            Draft202012Validator(tool.spec.parameters).validate(call.arguments)
-            if not all(self.permissions.check(tool.spec.action, resource) for resource in tool.resources(call.arguments)):
+            Draft202012Validator(tool.spec.parameters).validate(call.arguments)                                             # 校验参数是否正确（是否有必填参数等）
+            if not all(self.permissions.check(tool.spec.action, resource) for resource in tool.resources(call.arguments)):  # 审批操作合法性，若有一个false则返回deny
                 return self._error(call, "permission_denied", f"Permission denied: {call.name}")
-            result = tool.execute(call.call_id, call.arguments, self.context)
+            result = tool.execute(call.call_id, call.arguments, self.context)                                               # 执行
             if not isinstance(result, ToolResult) or result.call_id != call.call_id:
                 raise ValueError("Tool returned an invalid result or mismatched call_id")
             limit = self.context.max_output_chars
             if len(result.content) > limit:
-                result = replace(result, content=result.content[:limit], metadata={**result.metadata, "truncated": True})
+                result = replace(result, content=result.content[:limit], metadata={**result.metadata, "truncated": True})   # 超出则截断
             return result
         except ValidationError as exc:
             return self._error(call, "invalid_arguments", f"Invalid arguments for {call.name}: {exc.message}")

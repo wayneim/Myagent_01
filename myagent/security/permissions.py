@@ -15,9 +15,9 @@ class PermissionEffect(str, Enum):
 
 @dataclass(frozen=True)
 class PermissionRule:
-    action: str
-    resource: str
-    effect: PermissionEffect
+    action: str                 # 操作类别（read，write...)
+    resource: str               # 操作目标或匹配模式（README.md,"docs/*"...)
+    effect: PermissionEffect    # 匹配后的处理方式（允许？拒绝？）
 
 
 class ApprovalHandler:
@@ -49,12 +49,10 @@ class PermissionEngine:
     def check(self, action: str, resource: str) -> bool:
         effect = PermissionEffect.ASK
         for rule in self._rules:
-            if rule.action in ("*", action) and fnmatch(resource, rule.resource):
-                if rule.effect is PermissionEffect.DENY:
+            if rule.action in ("*", action) and fnmatch(resource, rule.resource):   # 匹配对应规则的操作和资源（fnmatch通配符匹配）
+                if rule.effect is PermissionEffect.DENY:       # 拒绝直接返回
                     return False
                 effect = rule.effect
         if effect is PermissionEffect.ALLOW:
             return True
-        if effect is PermissionEffect.DENY:
-            return False
         return self._approval_handler.approve(action, resource)

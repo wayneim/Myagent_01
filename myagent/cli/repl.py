@@ -92,7 +92,7 @@ def main() -> int:
             print("Commands: :new (new conversation), :help, :quit")
             continue
         if task:
-            agent.run(task, max_steps=config.max_steps, session_id=session.session_id)
+            agent.run(task, max_steps=config.max_steps, session_id=session.session_id)  # 通过session_id复用session
 
 
 if __name__ == "__main__":

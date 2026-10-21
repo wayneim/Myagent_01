@@ -67,7 +67,7 @@ class QwenProvider(LLMProvider):
                     arguments = {}
                     error = f"Invalid tool JSON: {exc}"
                 calls.append(ToolCall(tc.id, tc.function.name, arguments, parse_error=error))
-        payload = message.model_dump(mode="json", exclude_none=True)
+        payload = message.model_dump(mode="json", exclude_none=True)    # 将原始信息转为json格式存入provider message
         return AssistantTurn("\n".join(text_parts), tuple(calls), payload, "qwen")
 
     def _serialize(self, messages: Iterable[Message]) -> list[dict[str, object]]:
@@ -77,7 +77,7 @@ class QwenProvider(LLMProvider):
                 history.append({"role": "user", "content": message.content})
             elif isinstance(message, AssistantTurn):
                 if message.provider == "qwen" and message.provider_message is not None:
-                    history.append(deepcopy(message.provider_message))
+                    history.append(deepcopy(message.provider_message))      # 优先使用llm返回的信息，原样传回
                 else:
                     payload = {"role": "assistant", "content": message.text or None}
                     if message.tool_calls:
