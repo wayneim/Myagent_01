@@ -59,9 +59,6 @@ class Agent:
                         
             # TODO：区分模型停止与任务完成，处理无工具调用的空回复、截断等情况。
             # 详见根目录《待改进.md》的“任务完成判定”。
-                        
-            # TODO：区分模型停止与任务完成，处理无工具调用的空回复、截断等情况。
-            # 详见根目录《待改进.md》的“任务完成判定”。
             if not turn.tool_calls:
                 self._emit(session, AgentEvent(EventType.TASK_COMPLETED, {"text": turn.text}))
                 return AgentResponse(turn.text, session_id=session.session_id)
@@ -77,8 +74,6 @@ class Agent:
                     cancelled = True
                     result = ToolResult(call.call_id, "Task interrupted; side effects may have occurred", True)
                 results.append(result)
-                
-                # TODO 读取文件时会将整个文件输出到终端，考虑是否需要改进
                 
                 # TODO 读取文件时会将整个文件输出到终端，考虑是否需要改进
                 self._emit(session, AgentEvent(EventType.TOOL_COMPLETED, {"call_id": result.call_id, "is_error": result.is_error, "content": result.content}))
