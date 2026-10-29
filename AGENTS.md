@@ -26,6 +26,7 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 - `core.py`: orchestrates model/tool turns, stores both assistant and tool messages, bounds steps and handles ProviderError/cancellation.
 - `providers/minimax.py` and `providers/qwen.py`: rebuild requests from the supplied transcript; they do not cache conversation history. Original assistant payloads are JSON dictionaries, preserving required protocol blocks and IDs.
 - `tools/executor.py`: validates JSON Schema, checks every declared resource through PermissionEngine, executes and normalizes errors/output limits.
+- `tools/file_changes.py`, `files.py` and `patch.py`: shared byte snapshots, full-file SHA-256, optional expected_hash (or missing for create-only), same-directory unique temporaries and commit-time rechecks. Patch preflight simulates all operations and commits final content once per file. Preflight failure has zero writes; commit failure reports modified_files without rollback. Later same-file hashes refer to staged content. Omitting expected_hash does not protect against changes since an earlier read.
 - `security/permissions.py`: matching deny wins over allow; among other matching rules the last match wins. CLI approvals remain one-time.
 - `security/workspace.py` and file search tools: enforce workspace/sensitive paths for searches and direct reads; searches also check each matched file's read permission.
 - `runtime.py`: plan mode exposes inspection tools; build adds editing tools. Local Shell is registered only with explicit opt-in.
@@ -50,6 +51,12 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 - Regression fixes cover the simplified ToolSpec constructor, exactly-once event storage/dispatch, and the duplicate cancellation callback declaration.
 - Prompt tests cover root-only instruction scope, the byte limit, UTF-8/BOM, path/link/sensitive-file and permission boundaries, runtime facts, multi-turn replay and structured JSON startup errors. All provider responses are mocked; no real API call was made.
 
+## Verified on 2026-10-29
+
+- `venv\Scripts\python.exe -m pytest -q`: **145 passed**, no skipped tests in this environment.
+- File-change tests use scratch workspaces, fake providers and injected failures; no real API call or real credential loading.
+- Covered stale hashes, missing/empty files, raw-byte hashes, unique temporaries, cleanup on failure/interruption, preflight zero writes, staged same-file edits, partial commit reports, target permissions and model-visible hash recovery.
+
 ## Development rules
 
 - Keep Agent dependent on internal protocols/interfaces; no SDK types or provider-specific branches in Core.
@@ -70,8 +77,8 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 - Sessions/events are memory-only; no disk resume, compaction, durable memory or token/cost accounting.
 - No streaming, explicit application retry policy, repeated-call detection, background jobs, scheduler or team runtime.
 - Ctrl+C is normalized by Core, but local subprocess cancellation does not yet guarantee termination of the entire process tree.
-- apply_patch still applies operations sequentially. A later preflight/I/O failure may leave earlier edits in place; it is not transactional.
-- File writes lack expected-hash conflict detection and use a fixed temporary filename.
+- apply_patch preflights all operations before any writes, then commits each final file sequentially. Commit-time I/O failure or conflict can leave earlier files changed (and directories created); modified_files reports successful replacements. No automatic rollback or multi-file transaction.
+- Expected-hash/snapshot checks are optimistic, not file locks or OS compare-and-swap. External writers can still race between the final check and replacement; absent expected_hash does not detect stale reads from before tool execution.
 - Searches skip common generated directories, binary-looking files and oversized grep files, but do not implement full gitignore support or regex CPU timeouts.
 - Per-tool output truncation is not a complete context-management system; large reads and subprocess capture still need work.
 - SDK/default model compatibility requires a separately configured real-provider smoke run.
@@ -79,7 +86,7 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 ## Next step: S2 single-agent MVP
 
 1. Root-only bounded project instructions and OS/Shell/workspace prompt facts are implemented. Nested instruction inheritance is deferred; direct Agent construction may supply a custom prompt.
-2. Add unique atomic-write temporaries, expected-content hashes and full patch preflight before writes.
+2. Unique same-directory write temporaries, optional expected-content hashes and full in-memory patch preflight are implemented; preserve the documented optimistic-concurrency and partial-commit limitations.
 3. Capture Git baseline and summarize this task's changes without resetting existing user work.
 4. Validate one configured real provider in a disposable exercise repository, then address actual timeout/truncation/retry issues observed.
 5. Advance to Hooks/Todo/Skills only after that coding MVP is understood and verified. Follow the full staged plan for later mechanisms.
