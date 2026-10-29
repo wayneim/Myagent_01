@@ -7,18 +7,13 @@ from pathlib import Path
 from typing import Callable
 
 from .provider import LLMProvider, ProviderError
+from .prompting import BASE_SYSTEM_PROMPT as SYSTEM_PROMPT
 from .protocol import AgentEvent, AgentResponse, EventType, ToolResult, ToolResultsMessage, UserMessage
 from .security.permissions import PermissionEngine
 from .session import Session, SessionStore
 from .tools.base import ExecutionContext
 from .tools.executor import ToolExecutor
 from .tools.registry import ToolRegistry
-
-
-SYSTEM_PROMPT = """You are a local coding agent. Use available tools to inspect and modify the workspace.
-Read relevant files before editing. Respect tool errors and permission denials; never invent tool results.
-Use failed validation or test output to correct your next action. Summarize changes and validation at the end.
-"""
 
 
 @dataclass
@@ -94,7 +89,5 @@ class Agent:
 
     def _emit(self, session: Session, event: AgentEvent) -> None:
         session.events.append(event)        # 保存事件
-        session.events.append(event)        # 保存事件
         if self.event_handler:
-            self.event_handler(event)       # 打印事件
             self.event_handler(event)       # 打印事件

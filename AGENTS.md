@@ -29,6 +29,7 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 - `security/permissions.py`: matching deny wins over allow; among other matching rules the last match wins. CLI approvals remain one-time.
 - `security/workspace.py` and file search tools: enforce workspace/sensitive paths for searches and direct reads; searches also check each matched file's read permission.
 - `runtime.py`: plan mode exposes inspection tools; build adds editing tools. Local Shell is registered only with explicit opt-in.
+- `prompting.py`: default runtime snapshots root-only workspace AGENTS.md at Agent creation (UTF-8, at most 32 KiB), with workspace/sensitive-path and read-permission checks including link targets. Missing instructions are optional; unsafe, oversized or unreadable instructions fail startup. No parent/nested instruction inheritance yet. Prompt includes actual OS, workspace, mode and local Shell availability/limitations.
 - `cli/repl.py`: followups share a session; :new isolates a new conversation. One-shot failures return nonzero status; JSON mode is one-shot only and defaults to noninteractive approval denial. `--approval-mode interactive` enables one-time terminal approvals on stderr when stdin and stderr are terminals; without a terminal, ASK is denied.
 
 ## Verified on 2026-10-18
@@ -41,6 +42,13 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 - `tests/test_provider_contract.py` exercises real SDK response models with mocked network calls for both providers, including replay, isolation and error mapping.
 - `tests/test_workflow.py` uses scripted model decisions, real file tools and local Python assertions. It verifies read -> failing check -> failed edit -> corrected edit -> passing check -> followup.
 - No real MiniMax or Qwen API call was performed. Do not infer real model success from scripted tests.
+
+## Verified on 2026-10-26
+
+- `venv\Scripts\python.exe -m pytest -q`: **111 passed**, no skipped tests in this environment.
+- `pip check`, `compileall` and CLI `--help`: passed.
+- Regression fixes cover the simplified ToolSpec constructor, exactly-once event storage/dispatch, and the duplicate cancellation callback declaration.
+- Prompt tests cover root-only instruction scope, the byte limit, UTF-8/BOM, path/link/sensitive-file and permission boundaries, runtime facts, multi-turn replay and structured JSON startup errors. All provider responses are mocked; no real API call was made.
 
 ## Development rules
 
@@ -70,7 +78,7 @@ S0 and S1 implement the development environment and a reliable offline single-ag
 
 ## Next step: S2 single-agent MVP
 
-1. Load bounded workspace/project instructions and include OS/Shell/workspace facts in prompt assembly.
+1. Root-only bounded project instructions and OS/Shell/workspace prompt facts are implemented. Nested instruction inheritance is deferred; direct Agent construction may supply a custom prompt.
 2. Add unique atomic-write temporaries, expected-content hashes and full patch preflight before writes.
 3. Capture Git baseline and summarize this task's changes without resetting existing user work.
 4. Validate one configured real provider in a disposable exercise repository, then address actual timeout/truncation/retry issues observed.

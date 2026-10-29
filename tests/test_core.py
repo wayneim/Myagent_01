@@ -12,7 +12,7 @@ from myagent.tools.registry import ToolRegistry
 
 
 class FakeTool(Tool):
-    spec = ToolSpec("fake", "Fake test tool", {"type": "object", "properties": {}}, "read", True, True)
+    spec = ToolSpec("fake", "Fake test tool", {"type": "object", "properties": {}}, "read")
 
     def execute(self, call_id, arguments, context):
         return ToolResult(call_id, "fake result")
@@ -47,6 +47,20 @@ def test_agent_core_is_provider_independent(tmp_path: Path) -> None:
     assert history[1].tool_calls[0].call_id == "call-1"
     assert history[2].results == (ToolResult("call-1", "fake result"),)
     assert agent.session_store.get(response.session_id).messages[-1].text == "completed"
+
+
+def test_events_are_stored_and_dispatched_once_in_order(tmp_path):
+    agent = make_agent(tmp_path)
+    delivered = []
+    agent.event_handler = delivered.append
+    response = agent.run("do it")
+    events = agent.session_store.get(response.session_id).events
+    assert [event.type for event in events] == [
+        EventType.TASK_STARTED, EventType.ASSISTANT_TURN, EventType.TOOL_REQUESTED,
+        EventType.TOOL_COMPLETED, EventType.ASSISTANT_TURN, EventType.TASK_COMPLETED,
+    ]
+    assert delivered == events
+    assert len({id(event) for event in events}) == len(events)
 
 
 def test_followup_includes_both_user_turns_and_new_session_is_isolated(tmp_path):

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .config import AgentConfig
 from .core import Agent
+from .prompting import build_system_prompt
 from .providers.registry import provider_registry
 from .security.permissions import ApprovalHandler, PermissionEffect, PermissionEngine, PermissionRule
 from .security.sandbox import ProcessResult
@@ -33,7 +34,6 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
         raise ValueError(f"Unsupported mode: {mode}")
     if not config.workspace.is_dir():
         raise ValueError(f"Workspace directory does not exist: {config.workspace}")
-    provider = provider_registry.create(config)
     resolver = WorkspaceResolver(config.workspace)
     rules = [
         PermissionRule("read", "*", PermissionEffect.ALLOW),
@@ -42,20 +42,25 @@ def build_agent(config: AgentConfig, event_handler=None, mode: str = "build", ap
         rules.append(PermissionRule("edit", "*", PermissionEffect.ASK))
         rules.append(PermissionRule("shell", "*", PermissionEffect.ASK))
     permissions = PermissionEngine(rules, approval_handler=approval_handler)
+    local_shell_enabled = config.allow_unsandboxed_shell and mode == "build"
+    system_prompt = build_system_prompt(
+        resolver, permissions, mode=mode, local_shell_enabled=local_shell_enabled,
+    )
+    provider = provider_registry.create(config)
     context = ExecutionContext(
         config.workspace,
         permissions,
         max_output_chars=config.max_tool_output_chars,
         workspace_resolver=resolver,
-        sandbox_backend=LocalProcessBackend() if config.allow_unsandboxed_shell else None,      # 因为当前 Shell 使用的是 LocalProcessBackend，它没有操作系统级隔离，所以项目要求用户显式启用。
+        sandbox_backend=LocalProcessBackend() if local_shell_enabled else None,      # 本地后端没有 OS 隔离，且仅在 build 模式显式启用。
     )
     registry = ToolRegistry()
     for tool in (ReadFileTool(), GlobTool(), GrepTool(), EditFileTool(), WriteFileTool(), ApplyPatchTool(), git_status(), git_diff()):
         registry.register(tool)
-    if config.allow_unsandboxed_shell:
+    if local_shell_enabled:
         registry.register(ShellTool())
     if mode == "plan":
         registry = ToolRegistry()
         for tool in (ReadFileTool(), GlobTool(), GrepTool(), git_status(), git_diff()):
             registry.register(tool)
-    return Agent(provider, registry, permissions, context, event_handler=event_handler)
+    return Agent(provider, registry, permissions, context, system_prompt=system_prompt, event_handler=event_handler)
